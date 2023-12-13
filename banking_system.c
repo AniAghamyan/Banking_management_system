@@ -8,36 +8,56 @@ struct user {
     char password[50];
     float balance;
 };
-void changePassword(struct user *user, char *password) {
+void changePassword(struct user *user, const char *password) {
     FILE *user_records_file;
-    char temp_filename[50];
-    sprintf(temp_filename, "temp_%s", "user_records.txt");
-    FILE *temp_file = fopen(temp_filename, "w");
+    user_records_file = fopen("user_records.txt", "r+");
 
-    if (temp_file != NULL) {
-        user_records_file = fopen("user_records.txt", "r");
+    if (user_records_file != NULL) {
+        char *file_contents = NULL;
+        long file_size;
 
-        if (user_records_file != NULL) {
-            char line[100];
-            while (fgets(line, sizeof(line), user_records_file) != NULL) {
-                char ac[50], stored_phone[50], stored_password[50];
-                if (sscanf(line, "Account: %s, Phone: %s, Password: %s", ac, stored_phone, stored_password) == 3) {
-                    if (strcmp(user->phone, stored_phone) == 0) {
-                        fprintf(temp_file, "Account: %s, Phone: %s, Password: %s\n", ac, stored_phone, password);
-                    } else {
-                        fprintf(temp_file, "%s", line);
-                    }
-                }
+        // Determine the size of the file
+        fseek(user_records_file, 0, SEEK_END);
+        file_size = ftell(user_records_file);
+        fseek(user_records_file, 0, SEEK_SET);
+
+        // Read the entire file into memory
+        file_contents = (char *)malloc(file_size);
+        fread(file_contents, 1, file_size, user_records_file);
+
+        // Find and replace the password in memory
+        char *match = strstr(file_contents, user->phone);
+        if (match != NULL) {
+            char *password_pos = strstr(match, "Password:");
+            if (password_pos != NULL) {
+                snprintf(password_pos + 9, 50, " %s", password);
             }
+        }
 
-            fclose(user_records_file);
-            fclose(temp_file);
+        // Write the modified data back to the user_records.txt file
+        fseek(user_records_file, 0, SEEK_SET);
+        fwrite(file_contents, 1, file_size, user_records_file);
 
-            remove("user_records.txt");
-            rename(temp_filename, "user_records.txt");
+        fclose(user_records_file);
+        free(file_contents);
+
+        // Update the password in the associated .dat file
+        FILE *user_dat_file;
+        char filename[50];
+        strcpy(filename, user->phone);
+        user_dat_file = fopen(strcat(filename, ".dat"), "r+");
+
+        if (user_dat_file != NULL) {
+            fread(user, sizeof(struct user), 1, user_dat_file);
+            fseek(user_dat_file, 0, SEEK_SET);
+            strcpy(user->password, password);
+            fwrite(user, sizeof(struct user), 1, user_dat_file);
+            fclose(user_dat_file);
         }
     }
 }
+
+
 
 int main(){
     struct user user, usr;
@@ -198,12 +218,18 @@ int main(){
                                 printf("\nRegistered Users :\n");
                                 char line[100];
                                 while (fgets(line, sizeof(line), fp) != NULL) {
-                                    printf("%s", line);
+                                    char *account_pos = strstr(line, "Account:");
+                                    char *phone_pos = strstr(line, "Phone:");
+
+                                    if (account_pos != NULL && phone_pos != NULL) {
+                                        char account[50], phone[50];
+                                        sscanf(account_pos + 8, "%s", account);
+                                        sscanf(phone_pos + 6, "%s", phone);
+                                        printf("Account: %s, Phone: %s\n", account, phone);
+                                    }
                                 }
                                 fclose(fp);
                             }
-                            break;
-                        default:
                             break;
                     }
 
